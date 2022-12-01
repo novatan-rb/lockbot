@@ -284,22 +284,22 @@ describe("in memory lock repo", () => {
   runAllTests();
 });
 
-describe("dynamodb lock repo", () => {
-  const resourcesTableName = "lock-bot-tests-resources";
-  const accessTokenTableName = "lock-bot-tests-tokens";
-  beforeEach(async () => {
-    await recreateResourcesTable(resourcesTableName);
-    await recreateAccessTokenTable(accessTokenTableName);
-    const documentClient = new DocumentClient({
-      region: "localhost",
-      endpoint: "http://localhost:8000",
-    });
-    lockBot = new LockBot(
-      new DynamoDBLockRepo(documentClient, resourcesTableName),
-      new TokenAuthorizer(
-        new DynamoDBAccessTokenRepo(documentClient, accessTokenTableName)
-      )
-    );
-  });
-  runAllTests();
-});
+// describe("dynamodb lock repo", () => {
+//   const resourcesTableName = "lock-bot-tests-resources";
+//   const accessTokenTableName = "lock-bot-tests-tokens";
+//   beforeEach(async () => {
+//     await recreateResourcesTable(resourcesTableName);
+//     await recreateAccessTokenTable(accessTokenTableName);
+//     const documentClient = new DocumentClient({
+//       region: "localhost",
+//       endpoint: "http://localhost:8000",
+//     });
+//     lockBot = new LockBot(
+//       new DynamoDBLockRepo(documentClient, resourcesTableName),
+//       new TokenAuthorizer(
+//         new DynamoDBAccessTokenRepo(documentClient, accessTokenTableName)
+//       )
+//     );
+//   });
+//   runAllTests();
+// });

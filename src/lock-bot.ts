@@ -5,11 +5,6 @@ export interface LockRepo {
     channel: string,
     team: string
   ): Promise<Map<string, Owner[]>>;
-  getOwner(
-    resource: string,
-    channel: string,
-    team: string
-  ): Promise<string | undefined>;
   getOwners(
     resource: string,
     channel: string,
@@ -27,13 +22,6 @@ export interface LockRepo {
     channel: string,
     team: string
   ): Promise<string[]>;
-  setOwner(
-    resource: string,
-    name: string,
-    channel: string,
-    team: string,
-    metadata?: Record<string, string>
-  ): Promise<void>;
 }
 
 export type Destination = "user" | "channel";

@@ -36,15 +36,6 @@ export default class InMemoryLockRepo implements LockRepo {
     return all;
   }
 
-  async getOwner(
-    resource: string,
-    channel: string,
-    team: string
-  ): Promise<string | undefined> {
-    return this.lockMap.get(InMemoryLockRepo.toKey(resource, channel, team))?.[0]
-      ?.name;
-  }
-
   async getOwners(
     resource: string,
     channel: string,
@@ -80,17 +71,5 @@ export default class InMemoryLockRepo implements LockRepo {
     const newOwners = owners ? owners.concat({ name: owner, created: new Date() }) : [{ name: owner, created: new Date() }];
     this.lockMap.set(key, newOwners);
     return newOwners.map(o => o.name);
-  }
-
-  async setOwner(
-    resource: string,
-    name: string,
-    channel: string,
-    team: string
-  ): Promise<void> {
-    this.lockMap.set(InMemoryLockRepo.toKey(resource, channel, team), [{
-      name,
-      created: new Date(),
-    }]);
   }
 }
