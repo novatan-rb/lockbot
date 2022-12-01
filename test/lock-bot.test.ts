@@ -121,21 +121,14 @@ const runAllTests = () => {
   });
   test("unlock unlocked resource", async () => {
     expect(await execute("/unlock dev")).toEqual({
-      message: "`dev` is already unlocked 🔓",
+      message: "No one is in line for `dev` 🔒",
       destination: "user",
     });
   });
   test("can unlock resource", async () => {
     await execute("/lock dev");
     expect(await execute("/unlock dev")).toEqual({
-      message: "<@Connor> has unlocked `dev` 🔓",
-      destination: "channel",
-    });
-  });
-  test("can unlock different resource", async () => {
-    await execute("/lock test");
-    expect(await execute("/unlock test")).toEqual({
-      message: "<@Connor> has unlocked `test` 🔓",
+      message: "No one is in line for `dev` 🔒",
       destination: "channel",
     });
   });
@@ -149,33 +142,11 @@ const runAllTests = () => {
       destination: "user",
     });
   });
-  test("cannot unlock someone else's resource", async () => {
+  test("noop when try to unlock someone else's resource", async () => {
     await execute("/lock test");
     expect(await execute("/unlock test", { user: "Dave" })).toEqual({
-      message: "Cannot unlock `test`, locked by <@Connor> 🔒",
+      message: "<@Connor> has locked `test` 🔒",
       destination: "user",
-    });
-  });
-  test("cannot unlock someone else's resource (different user and resource)", async () => {
-    await execute("/lock dev", { user: "Dave" });
-    expect(await execute("/unlock dev")).toEqual({
-      message: "Cannot unlock `dev`, locked by <@Dave> 🔒",
-      destination: "user",
-    });
-  });
-  test("can force unlock someone else's resource (different user and resource)", async () => {
-    await execute("/lock dev", { user: "Dave" });
-    expect(await execute("/unlock dev force")).toEqual({
-      message:
-        "<@Connor> has force unlocked `dev` 🔓 which was locked by <@Dave>",
-      destination: "channel",
-    });
-  });
-  test("can force unlock own resource", async () => {
-    await execute("/lock dev");
-    expect(await execute("/unlock dev force")).toEqual({
-      message: "<@Connor> has unlocked `dev` 🔓",
-      destination: "channel",
     });
   });
   test("cannot unlock without providing resource name", async () => {
@@ -185,8 +156,7 @@ const runAllTests = () => {
         "To unlock a resource in this channel called `thingy`, use `/unlock thingy`\n\n" +
         "_Example:_\n" +
         `> *<@Connor>*: \`/unlock dev\`\n` +
-        `> *Lockbot*: <@Connor> has unlocked \`dev\` 🔓\n\n` +
-        "To force unlock a resource locked by someone else, use `/unlock thingy force`",
+        `> *Lockbot*: <@Connor> has unlocked \`dev\` 🔓\n\n`,
       destination: "user",
     });
   });
@@ -197,8 +167,7 @@ const runAllTests = () => {
         "To unlock a resource in this channel called `thingy`, use `/unlock thingy`\n\n" +
         "_Example:_\n" +
         `> *<@Connor>*: \`/unlock dev\`\n` +
-        `> *Lockbot*: <@Connor> has unlocked \`dev\` 🔓\n\n` +
-        "To force unlock a resource locked by someone else, use `/unlock thingy force`",
+        `> *Lockbot*: <@Connor> has unlocked \`dev\` 🔓\n\n`,
       destination: "user",
     });
   });

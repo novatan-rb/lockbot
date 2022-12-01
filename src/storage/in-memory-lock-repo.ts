@@ -18,10 +18,6 @@ export default class InMemoryLockRepo implements LockRepo {
     return { resource, channel, team };
   };
 
-  async delete(resource: string, channel: string, team: string): Promise<void> {
-    this.lockMap.delete(InMemoryLockRepo.toKey(resource, channel, team));
-  }
-
   async getAll(
     channel: string,
     team: string
@@ -55,6 +51,22 @@ export default class InMemoryLockRepo implements LockRepo {
     team: string
   ): Promise<string[] | undefined> {
     return this.lockMap.get(InMemoryLockRepo.toKey(resource, channel, team))?.map(o => o.name);
+  }
+
+  async dequeueOwner(
+    resource: string,
+    channel: string,
+    team: string,
+    owner: string
+  ): Promise<string[]> {
+    const key = InMemoryLockRepo.toKey(resource, channel, team)
+    const owners = this.lockMap.get(key);
+    if (!owners) {
+      return [];
+    }
+    const newOwners = owners.filter(o => o.name != owner);
+    this.lockMap.set(key, newOwners);
+    return newOwners.map(o => o.name);
   }
 
   async enqueueOwner(

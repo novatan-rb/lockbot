@@ -1,7 +1,6 @@
 import TokenAuthorizer from "./token-authorizer";
 
 export interface LockRepo {
-  delete(resource: string, channel: string, team: string): Promise<void>;
   getAll(
     channel: string,
     team: string
@@ -17,6 +16,12 @@ export interface LockRepo {
     team: string
   ): Promise<string[] | undefined>;
   enqueueOwner(
+    resource: string,
+    owner: string,
+    channel: string,
+    team: string
+  ): Promise<string[]>;
+  dequeueOwner(
     resource: string,
     owner: string,
     channel: string,
@@ -39,11 +44,11 @@ export interface Response {
   destination: Destination;
 }
 
-function queueMessage(resource: string, owners: string[]): string {
-  if (owners.length == 0) {
+function queueMessage(resource: string, owners: string[] | undefined): string {
+  if (!owners || owners.length === 0) {
     return `No one is in line for \`${resource}\` 🔒`;
   }
-  if (owners.length == 1) {
+  if (owners.length === 1) {
     return `<@${owners[0]}> has locked \`${resource}\` 🔒`;
   }
   return `<@${owners[0]}> has locked \`${resource}\`, with ${ownerNameList(owners.slice(1, -1))} waiting in line. 🔒`;
@@ -112,39 +117,22 @@ export default class LockBot {
           "To unlock a resource in this channel called `thingy`, " +
           "use `/unlock thingy`\n\n_Example:_\n" +
           `> *<@${user}>*: \`/unlock dev\`\n` +
-          `> *Lockbot*: <@${user}> has unlocked \`dev\` 🔓\n\n` +
-          "To force unlock a resource locked by someone else, " +
-          "use `/unlock thingy force`",
+          `> *Lockbot*: <@${user}> has unlocked \`dev\` 🔓\n\n`,
         destination: "user",
       };
     }
-    const lockOwner = await this.lockRepo.getOwner(resource, channel, team);
-    if (!lockOwner) {
+    const lockOwners = await this.lockRepo.getOwners(resource, channel, team);
+    if (!lockOwners || !lockOwners.includes(user)) {
       return {
-        message: `\`${resource}\` is already unlocked 🔓`,
+        message: queueMessage(resource, lockOwners),
         destination: "user",
       };
     }
 
-    if (user === lockOwner) {
-      await this.lockRepo.delete(resource, channel, team);
-      return {
-        message: `<@${user}> has unlocked \`${resource}\` 🔓`,
-        destination: "channel",
-      };
-    }
-    if (user !== lockOwner && options.force) {
-      await this.lockRepo.delete(resource, channel, team);
-      return {
-        message:
-          `<@${user}> has force unlocked \`${resource}\` 🔓 ` +
-          `which was locked by <@${lockOwner}>`,
-        destination: "channel",
-      };
-    }
+    const newLockOwners = await this.lockRepo.dequeueOwner(resource, channel, team, user);
     return {
-      message: `Cannot unlock \`${resource}\`, locked by <@${lockOwner}> 🔒`,
-      destination: "user",
+      message: queueMessage(resource, newLockOwners),
+      destination: "channel",
     };
   };
 
