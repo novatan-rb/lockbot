@@ -5,15 +5,26 @@ export interface LockRepo {
   getAll(
     channel: string,
     team: string
-  ): Promise<Map<string, { owner: string; created: Date }>>;
+  ): Promise<Map<string, Owner[]>>;
   getOwner(
     resource: string,
     channel: string,
     team: string
   ): Promise<string | undefined>;
-  setOwner(
+  getOwners(
+    resource: string,
+    channel: string,
+    team: string
+  ): Promise<string[] | undefined>;
+  enqueueOwner(
     resource: string,
     owner: string,
+    channel: string,
+    team: string
+  ): Promise<string[]>;
+  setOwner(
+    resource: string,
+    name: string,
     channel: string,
     team: string,
     metadata?: Record<string, string>
@@ -21,10 +32,29 @@ export interface LockRepo {
 }
 
 export type Destination = "user" | "channel";
+export type Owner = { name: string; created: Date }
 
 export interface Response {
   message: string;
   destination: Destination;
+}
+
+function queueMessage(resource: string, owners: string[]): string {
+  if (owners.length == 0) {
+    return `No one is in line for \`${resource}\` 🔒`;
+  }
+  if (owners.length == 1) {
+    return `<@${owners[0]}> has locked \`${resource}\` 🔒`;
+  }
+  return `<@${owners[0]}> has locked \`${resource}\`, with ${ownerNameList(owners.slice(1, -1))} waiting in line. 🔒`;
+}
+
+function ownerNameList(owners: string[]): string {
+  if (owners.length === 1) {
+    return `<@${owners[0]}>`;
+  }
+  const last = owners.pop();
+  return `<@${owners.join(", ")}> and <@${last}>`;
 }
 
 export default class LockBot {
@@ -51,22 +81,19 @@ export default class LockBot {
         destination: "user",
       };
     }
-    const lockOwner = await this.lockRepo.getOwner(resource, channel, team);
-    if (lockOwner) {
-      if (user === lockOwner) {
-        return {
-          message: `You have already locked \`${resource}\` 🔒`,
-          destination: "user",
-        };
-      }
+
+    const lockOwners = await this.lockRepo.getOwners(resource, channel, team);
+    if (lockOwners?.includes(user)) {
       return {
-        message: `\`${resource}\` is already locked by <@${lockOwner}> 🔒`,
+        message: queueMessage(resource, lockOwners),
         destination: "user",
       };
     }
-    await this.lockRepo.setOwner(resource, user, channel, team, metadata);
+
+    const newLockOwners = await this.lockRepo.enqueueOwner(resource, user, channel, team);
+
     return {
-      message: `<@${user}> has locked \`${resource}\` 🔒`,
+      message: queueMessage(resource, newLockOwners),
       destination: "channel",
     };
   };
@@ -130,7 +157,11 @@ export default class LockBot {
       };
     }
     let locksMessage = "Active locks in this channel:\n";
-    locks.forEach(({ owner: lockOwner, created: lockDate }, lockedResource) => {
+    locks.forEach((queueOwners, lockedResource) => {
+      const {
+        name: lockOwner,
+        created: lockDate,
+      } = queueOwners[0];
       locksMessage +=
         `> \`${lockedResource}\` is locked by <@${lockOwner}> 🔒` +
         ` _<!date^${Math.floor(

@@ -78,22 +78,23 @@ const runAllTests = () => {
   test("cannot lock resource twice", async () => {
     await execute("/lock dev");
     expect(await execute("/lock dev")).toEqual({
-      message: "You have already locked `dev` 🔒",
+      message: "<@Connor> has locked `dev` 🔒",
       destination: "user",
     });
   });
-  test("cannot lock different resource twice", async () => {
-    await execute("/lock test");
-    expect(await execute("/lock test")).toEqual({
-      message: "You have already locked `test` 🔒",
-      destination: "user",
-    });
-  });
-  test("cannot lock someone else's resource", async () => {
+  test("can lock different resource twice", async () => {
     await execute("/lock dev");
+    expect(await execute("/lock test")).toEqual({
+      message: "<@Connor> has locked `test` 🔒",
+      destination: "channel",
+    });
+  });
+  test("will be put in a queue when try to lock someone else's resource", async () => {
+    await execute("/lock dev");
+    await execute("/lock dev", { user: "Tom" });
     expect(await execute("/lock dev", { user: "Dave" })).toEqual({
-      message: "`dev` is already locked by <@Connor> 🔒",
-      destination: "user",
+      message: "<@Connor> has locked `dev`, with <@Tom> waiting in line. 🔒",
+      destination: "channel",
     });
   });
   test("cannot lock without providing resource name", async () => {

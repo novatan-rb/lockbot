@@ -1,7 +1,7 @@
-import { LockRepo } from "../lock-bot";
+import { LockRepo, Owner } from "../lock-bot";
 
 export default class InMemoryLockRepo implements LockRepo {
-  private readonly lockMap: Map<string, { owner: string; created: Date }> =
+  private readonly lockMap: Map<string, Owner[]> =
     new Map();
 
   private static readonly separator = "🎱🈂️💟🍐🍚🕕😽🎉⛎4️⃣";
@@ -25,8 +25,8 @@ export default class InMemoryLockRepo implements LockRepo {
   async getAll(
     channel: string,
     team: string
-  ): Promise<Map<string, { owner: string; created: Date }>> {
-    const all = new Map<string, { owner: string; created: Date }>();
+  ): Promise<Map<string, Owner[]>> {
+    const all = new Map<string, Owner[]>();
     this.lockMap.forEach((value, key) => {
       const {
         resource,
@@ -45,19 +45,40 @@ export default class InMemoryLockRepo implements LockRepo {
     channel: string,
     team: string
   ): Promise<string | undefined> {
-    return this.lockMap.get(InMemoryLockRepo.toKey(resource, channel, team))
-      ?.owner;
+    return this.lockMap.get(InMemoryLockRepo.toKey(resource, channel, team))?.[0]
+      ?.name;
   }
 
-  async setOwner(
+  async getOwners(
+    resource: string,
+    channel: string,
+    team: string
+  ): Promise<string[] | undefined> {
+    return this.lockMap.get(InMemoryLockRepo.toKey(resource, channel, team))?.map(o => o.name);
+  }
+
+  async enqueueOwner(
     resource: string,
     owner: string,
     channel: string,
     team: string
+  ): Promise<string[]> {
+    const key = InMemoryLockRepo.toKey(resource, channel, team)
+    const owners = this.lockMap.get(key);
+    const newOwners = owners ? owners.concat({ name: owner, created: new Date() }) : [{ name: owner, created: new Date() }];
+    this.lockMap.set(key, newOwners);
+    return newOwners.map(o => o.name);
+  }
+
+  async setOwner(
+    resource: string,
+    name: string,
+    channel: string,
+    team: string
   ): Promise<void> {
-    this.lockMap.set(InMemoryLockRepo.toKey(resource, channel, team), {
-      owner,
+    this.lockMap.set(InMemoryLockRepo.toKey(resource, channel, team), [{
+      name,
       created: new Date(),
-    });
+    }]);
   }
 }
