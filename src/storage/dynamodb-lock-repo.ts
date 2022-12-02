@@ -15,6 +15,28 @@ export default class DynamoDBLockRepo implements LockRepo {
     private readonly resourcesTableName: string
   ) {}
 
+  private async storeOwners(team: string, channel: string, resource: string, owners: Owner[]) {
+    await this.documentClient
+      .put({
+        TableName: this.resourcesTableName,
+        Item: {
+          Resource: resource,
+          Group: `${team}#${channel}`,
+          Owners: makeOwnersSavable(owners),
+        },
+      }).promise();
+  }
+
+  private async retrieveOwners(team: string, channel: string, resource: string): Promise<Owner[] | undefined> {
+    const result = await this.documentClient
+      .get({
+        TableName: this.resourcesTableName,
+        Key: { Resource: resource, Group: `${team}#${channel}` },
+      })
+      .promise();
+    return restoreOwners(result.Item?.Owners)
+  }
+
   async getAll(
     channel: string,
     team: string
@@ -41,13 +63,7 @@ export default class DynamoDBLockRepo implements LockRepo {
     channel: string,
     team: string
   ): Promise<string[] | undefined> {
-    const result = await this.documentClient
-      .get({
-        TableName: this.resourcesTableName,
-        Key: { Resource: resource, Group: `${team}#${channel}` },
-      })
-      .promise();
-    const owners = restoreOwners(result.Item?.Owners)
+    const owners = await this.retrieveOwners(team, channel, resource);
     return owners?.map(o => o.name);
   }
 
@@ -57,27 +73,12 @@ export default class DynamoDBLockRepo implements LockRepo {
     team: string,
     owner: string
   ): Promise<string[]> {
-    const result = await this.documentClient
-      .get({
-        TableName: this.resourcesTableName,
-        Key: { Resource: resource, Group: `${team}#${channel}` },
-      })
-      .promise();
-    const owners = restoreOwners(result.Item?.Owners)
+    const owners = await this.retrieveOwners(team, channel, resource);
     if (!owners) {
       return [];
     }
     const newOwners = owners.filter(o => o.name != owner);
-    await this.documentClient
-      .put({
-        TableName: this.resourcesTableName,
-        Item: {
-          Resource: resource,
-          Group: `${team}#${channel}`,
-          Owners: makeOwnersSavable(newOwners),
-        },
-      })
-      .promise();
+    await this.storeOwners(team, channel, resource, newOwners);
     return newOwners.map(o => o.name);
   }
 
@@ -87,26 +88,10 @@ export default class DynamoDBLockRepo implements LockRepo {
     channel: string,
     team: string
   ): Promise<string[]> {
-    const result = await this.documentClient
-      .get({
-        TableName: this.resourcesTableName,
-        Key: { Resource: resource, Group: `${team}#${channel}` },
-      })
-      .promise();
-    const owners : Owner[] = result.Item?.Owners
-
+    const owners = await this.retrieveOwners(team, channel, resource);
     const newOwners = owners ? owners.concat({ name: owner, created: new Date() }) : [{ name: owner, created: new Date() }];
 
-    await this.documentClient
-      .put({
-        TableName: this.resourcesTableName,
-        Item: {
-          Resource: resource,
-          Group: `${team}#${channel}`,
-          Owners: makeOwnersSavable(newOwners),
-        },
-      })
-      .promise();
+    await this.storeOwners(team, channel, resource, newOwners);
     return newOwners.map(o => o.name);
   }
 }
