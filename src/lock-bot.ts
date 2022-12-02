@@ -134,15 +134,13 @@ export default class LockBot {
     }
     let locksMessage = "Active locks in this channel:\n";
     locks.forEach((queueOwners, lockedResource) => {
-      const {
-        name: lockOwner,
-        created: lockDate,
-      } = queueOwners[0];
-      locksMessage +=
-        `> \`${lockedResource}\` is locked by <@${lockOwner}> 🔒` +
-        ` _<!date^${Math.floor(
-          lockDate.valueOf() / 1000
-        )}^{date_pretty} {time}|${lockDate.toUTCString()}>_\n`;
+      queueOwners?.forEach(({name: lockOwner, created: lockDate}) => {
+        locksMessage +=
+          `> \`${lockedResource}\` is locked by <@${lockOwner}> 🔒` +
+          ` _<!date^${Math.floor(
+            lockDate.valueOf() / 1000
+          )}^{date_pretty} {time}|${lockDate.toUTCString()}>_\n`;
+      });
     });
     return { message: locksMessage.trimRight(), destination: "user" };
   };

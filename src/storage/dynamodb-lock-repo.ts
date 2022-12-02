@@ -1,5 +1,13 @@
 import { DocumentClient } from "aws-sdk/clients/dynamodb";
-import { LockRepo } from "../lock-bot";
+import { LockRepo, Owner } from "../lock-bot";
+
+function makeOwnersSavable(owners: Owner[]): { name: string, created: string }[] {
+  return owners.map(o => ({ name: o.name, created: o.created.toString() }));
+}
+
+function restoreOwners(dbOwners: { name: string, created: string }[]): Owner[] {
+  return dbOwners?.map(o => ({ name: o.name, created: new Date(o.created) }));
+}
 
 export default class DynamoDBLockRepo implements LockRepo {
   constructor(
@@ -7,19 +15,10 @@ export default class DynamoDBLockRepo implements LockRepo {
     private readonly resourcesTableName: string
   ) {}
 
-  async delete(resource: string, channel: string, team: string): Promise<void> {
-    await this.documentClient
-      .delete({
-        TableName: this.resourcesTableName,
-        Key: { Resource: resource, Group: `${team}#${channel}` },
-      })
-      .promise();
-  }
-
   async getAll(
     channel: string,
     team: string
-  ): Promise<Map<string, { owner: string; created: Date }>> {
+  ): Promise<Map<string, Owner[]>> {
     const result = await this.documentClient
       .query({
         TableName: this.resourcesTableName,
@@ -28,47 +27,86 @@ export default class DynamoDBLockRepo implements LockRepo {
         ExpressionAttributeNames: { "#group": "Group" },
       })
       .promise();
-    const map = new Map<string, { owner: string; created: Date }>();
+    const map = new Map<string, Owner[]>();
     if (result.Items) {
-      result.Items.forEach((i) =>
-        map.set(i.Resource, { owner: i.Owner, created: new Date(i.Created) })
-      );
+      result.Items.forEach((i) => {
+        map.set(i.Resource, restoreOwners(i.Owners))
+      });
     }
     return map;
   }
 
-  async getOwner(
+  async getOwners(
     resource: string,
     channel: string,
     team: string
-  ): Promise<string | undefined> {
+  ): Promise<string[] | undefined> {
     const result = await this.documentClient
       .get({
         TableName: this.resourcesTableName,
         Key: { Resource: resource, Group: `${team}#${channel}` },
       })
       .promise();
-    return result.Item?.Owner;
+    const owners = restoreOwners(result.Item?.Owners)
+    return owners?.map(o => o.name);
   }
 
-  async setOwner(
+  async dequeueOwner(
     resource: string,
-    owner: string,
     channel: string,
     team: string,
-    metadata?: Record<string, string>
-  ): Promise<void> {
+    owner: string
+  ): Promise<string[]> {
+    const result = await this.documentClient
+      .get({
+        TableName: this.resourcesTableName,
+        Key: { Resource: resource, Group: `${team}#${channel}` },
+      })
+      .promise();
+    const owners = restoreOwners(result.Item?.Owners)
+    if (!owners) {
+      return [];
+    }
+    const newOwners = owners.filter(o => o.name != owner);
     await this.documentClient
       .put({
         TableName: this.resourcesTableName,
         Item: {
           Resource: resource,
           Group: `${team}#${channel}`,
-          Owner: owner,
-          Created: new Date().toISOString(),
-          Metadata: metadata,
+          Owners: makeOwnersSavable(newOwners),
         },
       })
       .promise();
+    return newOwners.map(o => o.name);
+  }
+
+  async enqueueOwner(
+    resource: string,
+    owner: string,
+    channel: string,
+    team: string
+  ): Promise<string[]> {
+    const result = await this.documentClient
+      .get({
+        TableName: this.resourcesTableName,
+        Key: { Resource: resource, Group: `${team}#${channel}` },
+      })
+      .promise();
+    const owners : Owner[] = result.Item?.Owners
+
+    const newOwners = owners ? owners.concat({ name: owner, created: new Date() }) : [{ name: owner, created: new Date() }];
+
+    await this.documentClient
+      .put({
+        TableName: this.resourcesTableName,
+        Item: {
+          Resource: resource,
+          Group: `${team}#${channel}`,
+          Owners: makeOwnersSavable(newOwners),
+        },
+      })
+      .promise();
+    return newOwners.map(o => o.name);
   }
 }

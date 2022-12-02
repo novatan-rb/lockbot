@@ -3,6 +3,8 @@ import DynamoDB from "aws-sdk/clients/dynamodb";
 const options = {
   region: "localhost",
   endpoint: "http://localhost:8000",
+  accessKeyId: 'foo',
+  secretAccessKey: 'bar',
 };
 
 export const recreateResourcesTable = async (resourcesTableName: string) => {
